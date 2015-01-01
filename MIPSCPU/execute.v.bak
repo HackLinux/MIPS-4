@@ -1,0 +1,84 @@
+
+module execute(	input clk,rst,
+		input [4:0] rtAddr,
+		input [9:0] pc_FETCH,
+		input [31:0] instructions, regAddr, readdata2,
+		output reg regwrite_WB,
+		output stall_EX,
+		output reg [2:0] regsel,
+		output [1:0] pc_src_EX,
+		output reg [9:0] jaddr, 
+		output [9:0] branch_addr_EX, reg_addr_EX, jtype_addr_EX,
+		output reg [31:0] aluhi, lo, alulo, memdata,
+		output reg [4:0] regdest_WB);
+
+
+	wire enhilo_EX, regwrite_EX, memwrite;
+	wire [1:0] aluSrcEX, rdrt_EX;
+	wire [2:0] regsel_EX;
+	wire [3:0] alu_op;
+
+	wire [5:0] function_code_EX, opcode_EX;
+	wire [9:0] memaddr;
+	wire [15:0] imm, alucompare;
+	wire [31:0] alu_hi, alu_lo, alu_data_2, memdata_EX;
+wire zero;
+wire stall;
+wire[4:0] rdAddr, rdest_EX;
+
+//branch assignments
+
+	assign jtype_addr_EX = instructions[9:0];
+	
+	
+	assign reg_addr_EX = regAddr[9:0];
+
+	assign alucompare = (zero ^ alu_op[1]) * instructions[15:0];
+	assign branch_addr_EX = alucompare[9:0] + pc_FETCH;
+	
+	
+		wire [4:0] shamt_EX, alu_shamt;
+		aluMux aluMux_execute( .aluSrcEx(aluSrcEX),
+			.imm(instructions[15:0]),
+			.regdata2(readdata2),
+			.alu_data_2(alu_data_2));
+			
+			
+	regMux regMux_execute( .rdrt_EX(rdrt_EX),
+			.rtAddr(rtAddr), .rdAddr(instructions[15:11]),
+			.writeAddr(rdest_EX));
+
+	control_unit control_unit_execute(	.shamt(instructions[10:6]),
+			.function_code(instructions[5:0]), .immOpp(instructions[31:26]),
+			.enhilo_EX(enhilo_EX), .regwrite_EX(regwrite_EX), .memwrite_EX(memwrite), .stall(stall_EX),
+			.regsel(regsel_EX), .alu_src(aluSrcEX), .rdrt_EX(rdrt_EX), .pc_src(pc_src_EX),
+			.alu_op(alu_op),
+			.alu_shamt(alu_shamt));
+	
+
+	alu alu_execute(	.a(regAddr), .b(alu_data_2),
+			.op(alu_op), .shamt(alu_shamt),
+			.hi(alu_hi), .lo(alu_lo),
+			.zero(zero));
+	
+
+	datamemory datamemory_execute(.clk(clk), .we(memwrite),
+			.addr(alu_lo[9:0]),
+			.datain(readdata2),
+			.dataout(memdata_EX));
+
+
+	always @(posedge clk) begin
+		regdest_WB <= rdest_EX;			
+		regwrite_WB <= regwrite_EX;	
+		regsel <= regsel_EX;			 
+		alulo <= alu_lo;					
+		memdata <= memdata_EX;		
+		jaddr <= jtype_addr_EX;
+		if(enhilo_EX) begin				
+			aluhi <= alu_hi;
+			lo <= alu_lo;
+		end
+	end
+	
+endmodule
