@@ -1,3 +1,6 @@
+/*Decoder Module to take 4 bit data and convert 
+to an active low representation on 7 segment display*/
+
 module sevenseg(input      [3:0] data, 
                 output reg [6:0] segments);	
   always @(*)
